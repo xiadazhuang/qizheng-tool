@@ -3,7 +3,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from core import calculate_qizheng
+from integrate import calculate_integrated as calculate_qizheng
 import json
 
 st.set_page_config(page_title="七政四余排盘", page_icon="🐱")
@@ -26,9 +26,10 @@ if submitted:
         result = calculate_qizheng(name, date, time, lat, lon)
         b = result["bazi"]
         
-        st.success(f"✅ {name} | {date} {time}")
+        st.success(f"✅ {name} | {date} {time} | 女命")
         
         # 八字
+        st.subheader("📋 八字")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("年柱", b["year"])
@@ -39,22 +40,45 @@ if submitted:
         with col4:
             st.metric("时柱", b["hour"])
         
+        # 紫微斗数
+        ziwei = result.get("ziwei")
+        if ziwei and "error" not in ziwei:
+            st.subheader("⭐ 紫微斗数")
+            cols = st.columns(3)
+            with cols[0]:
+                st.metric("五行局", ziwei.get("five_elements", "N/A"))
+            with cols[1]:
+                st.metric("命宫", ziwei.get("zodiac", "N/A"))
+            with cols[2]:
+                st.metric("身宫", ziwei.get("soul", "N/A"))
+            
+            # 十二宫
+            cols = st.columns(2)
+            palaces_left = ziwei.get("palaces", [])[:6]
+            palaces_right = ziwei.get("palaces", [])[6:]
+            with cols[0]:
+                for p in palaces_left:
+                    if p["major_stars"]:
+                        st.write(f"**{p['name']}**: {','.join(p['major_stars'])}")
+            with cols[1]:
+                for p in palaces_right:
+                    if p["major_stars"]:
+                        st.write(f"**{p['name']}**: {','.join(p['major_stars'])}")
+        
         # 七政
-        st.subheader("🌟 七政")
+        st.subheader("🌟 七政四余")
         cols = st.columns(7)
         planets = result["qizheng"]
         names = ["sun","moon","venus","mercury","jupiter","mars","saturn"]
         labels = ["太阳","月亮","金星","水星","木星","火星","土星"]
         for i, (k, l) in enumerate(zip(names, labels)):
             if k in planets:
-                v = planets[k]
                 with cols[i]:
-                    st.metric(l, f"{v['degree']:.1f}°", v["mansion"])
+                    st.metric(l, f"{planets[k]:.1f}°")
         
         # 四余
-        st.subheader("🌙 四余")
-        cols = st.columns(4)
         siyu = result["siyu"]
+        cols = st.columns(4)
         for i, (k, l) in enumerate(zip(["luohou","jitu","yuebo","ziqi"], ["罗睺","计都","月孛","紫炁"])):
             if k in siyu:
                 with cols[i]:
