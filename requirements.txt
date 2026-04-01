@@ -1,0 +1,6 @@
+pyswisseph>=2.10.0
+skyfield>=1.50
+lunarcalendar>=0.0.9
+ephem>=4.0
+sxtwl>=1.0
+iztro-py>=0.3.4
