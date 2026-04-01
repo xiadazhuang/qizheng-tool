@@ -5,6 +5,7 @@ import sys, os, re
 sys.path.insert(0, os.path.dirname(__file__))
 import swisseph as swe
 from seven_planets import calculate_seven_planets
+from mansions import map_to_mansion
 from four_remnants import calculate_luohou, calculate_jitu, calculate_yuebo, calculate_ziqi
 from lunar import calculate_bazi, solar_to_lunar
 
@@ -73,7 +74,12 @@ def calculate_integrated(name, birth_date, birth_time, lat, lon, gender='女'):
 
     bazi = calculate_bazi(year, month, day, hour, minute)
     lunar = solar_to_lunar(year, month, day)
-    planets = calculate_seven_planets(jd)
+    raw_planets = calculate_seven_planets(jd)
+    # 加入二十八宿名称
+    planets = {}
+    for k, deg in raw_planets.items():
+        mansion, inner = map_to_mansion(deg)
+        planets[k] = {'degree': deg, 'mansion': mansion, 'inner': round(inner, 2)}
     siyu = {
         'luohou': calculate_luohou(jd),
         'jitu': calculate_jitu(jd),
@@ -130,7 +136,9 @@ def to_text(data):
     PCN = {'sun':'太阳','moon':'月亮','venus':'金星','mercury':'水星','jupiter':'木星','mars':'火星','saturn':'土星'}
     lines.append(f"\n【七政四余】")
     for k, v in data['qizheng'].items():
-        lines.append(f"  {PCN.get(k, k)}: {v:.2f} deg")
+        deg = v['degree'] if isinstance(v, dict) else v
+        mansion = v.get('mansion', '') if isinstance(v, dict) else ''
+        lines.append(f"  {PCN.get(k, k)}: {deg:.2f}° ({mansion}宿)")
     sy = data['siyu']
     lines.append(f"  罗睺: {sy['luohou']:.2f} deg")
     lines.append(f"  计都: {sy['jitu']:.2f} deg")

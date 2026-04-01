@@ -1,9 +1,11 @@
 """七政四余核心计算入口"""
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
 import swisseph as swe
-from .seven_planets import calculate_seven_planets
-from .four_remnants import calculate_luohou, calculate_jitu, calculate_yuebo, calculate_ziqi
-from .mansions import map_to_mansion
-from .lunar import calculate_bazi, solar_to_lunar
+from seven_planets import calculate_seven_planets
+from four_remnants import calculate_luohou, calculate_jitu, calculate_yuebo, calculate_ziqi
+from mansions import map_to_mansion
+from lunar import calculate_bazi, solar_to_lunar
 
 def calculate_qizheng(name, birth_date, birth_time, lat, lon):
     """计算完整七政四余命盘"""
