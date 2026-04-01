@@ -26,7 +26,7 @@ STAR_MAP = {
 PALACE_MAP = {
     'siblingsPalace': '兄弟宫', 'soulPalace': '身宫', 'parentsPalace': '父母宫',
     'propertyPalace': '田宅宫', 'careerPalace': '官禄宫', 'friendsPalace': '交友宫',
-    'surfacePalace': '田宅宫', 'healthPalace': '疾厄宫', 'wealthPalace': '财帛宫',
+    'surfacePalace': '迁移宫', 'healthPalace': '疾厄宫', 'wealthPalace': '财帛宫',
     'childrenPalace': '子女宫', 'spousePalace': '夫妻宫',
     'spiritPalace': '福德宫',
 }
@@ -48,7 +48,7 @@ def _cn_star(name):
 def _cn_palace(name):
     n = name.lower()
     for k, v in PALACE_MAP.items():
-        if k in n:
+        if k.lower() in n:
             return v
     return name
 
