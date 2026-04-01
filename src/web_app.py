@@ -108,8 +108,10 @@ if sub:
         cols7 = st.columns(7)
         for i, (k, v) in enumerate(planets.items()):
             alias = STAR_ALIAS.get(k, PCN.get(k, k))
+            deg = v['degree'] if isinstance(v, dict) else v
+            mansion = v.get('mansion', '') if isinstance(v, dict) else ''
             with cols7[i]:
-                st.metric(alias, f"{v:.1f}°")
+                st.metric(alias, f"{deg:.1f}°\n{mansion}宿")
 
         # 四余
         st.markdown("**四余（罗睺·计都·月孛·紫炁）**")
