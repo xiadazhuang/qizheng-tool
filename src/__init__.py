@@ -7,6 +7,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from core import calculate_qizheng
 from output import to_json
+from qiyun import calculate_qiyun, format_qiyun
 
 __version__ = "0.1.0"
-__all__ = ["calculate_qizheng", "to_json"]
+__all__ = ["calculate_qizheng", "to_json", "qiyun"]
