@@ -3,7 +3,16 @@
 用于八字排盘的精确出生时间修正
 
 真太阳时 = 北京时间 + (当地经度 - 120) × 4分钟
-北京时间的时区经度是 120°E
+
+中国夏令时（DST）支持（1986-1991年）：
+  中国于1986-1991年实行夏令时，期间出生的人，实际时间 = 北京时间 - 1小时
+  具体时间区间（北京时间）为：
+    1986年: 5月4日 02:00 ~ 9月13日 02:00
+    1987年: 4月12日 02:00 ~ 9月12日 02:00
+    1988年: 4月10日 02:00 ~ 9月11日 02:00
+    1989年: 4月16日 02:00 ~ 9月16日 02:00
+    1990年: 4月15日 02:00 ~ 9月15日 02:00
+    1991年: 4月14日 02:00 ~ 9月14日 02:00
 """
 import time
 import urllib.request
@@ -59,6 +68,43 @@ CITY_COORDINATES_FALLBACK = {
     "南宁": (22.8170, 108.3665),
     "东莞": (23.0489, 113.7447),
 }
+
+# 中国夏令时时间区间表（start_date, end_date 为 (month, day) 元组）
+# 北京夏令时：每年 start_day 02:00 开始，end_day 02:00 结束
+CHINA_DST_PERIODS = {
+    1986: ((5, 4), (9, 13)),
+    1987: ((4, 12), (9, 12)),
+    1988: ((4, 10), (9, 11)),
+    1989: ((4, 16), (9, 16)),
+    1990: ((4, 15), (9, 15)),
+    1991: ((4, 14), (9, 14)),
+}
+
+
+def is_dst_period(year: int, month: int, day: int) -> bool:
+    """
+    判断某日期是否在夏令时期间（中国 1986-1991）
+
+    Args:
+        year: 出生年份
+        month: 出生月份（1-12）
+        day: 出生日期（1-31）
+
+    Returns:
+        True 如果在夏令时期间，否则 False
+
+    中国夏令时：每年特定日期 02:00 开始，到特定日期 02:00 结束。
+    02:00 切换意味着当天 00:00-01:59 仍然按标准时间，02:00 起进入夏令时。
+    为方便计算，我们以 00:00 为界：当天 00:00 起即视为夏令时生效。
+    """
+    if year not in CHINA_DST_PERIODS:
+        return False
+
+    (start_m, start_d), (end_m, end_d) = CHINA_DST_PERIODS[year]
+
+    # 使用 (month, day) 元组比较日期
+    # (start_m, start_d) <= (month, day) <= (end_m, end_d)
+    return (start_m, start_d) <= (month, day) <= (end_m, end_d)
 
 
 def get_city_coordinates(city_name: str, use_fallback: bool = True) -> tuple[float, float]:
@@ -147,27 +193,74 @@ def calculate_true_solar_time(timezone_hour: int, lon: float) -> int:
     return int(total_hours)
 
 
-def adjust_birth_hour_for_true_solar(hour: int, minute: int, lon: float) -> tuple[int, int]:
+def adjust_birth_hour_for_true_solar(
+    birth_hour: int,
+    birth_min: int,
+    lon: float,
+    year: int = None,
+    month: int = None,
+    day: int = None,
+) -> tuple[int, int, dict]:
     """
-    调整出生时间为真太阳时
+    调整出生时间为真太阳时（考虑中国夏令时 1986-1991）
+
+    处理流程：
+      1. 判断是否在夏令时期间（1986-1991年，每年特定日期区间）
+      2. 如果是夏令时，实际时间 = 北京时间 - 1小时（夏令时时间比真实时间快1小时）
+      3. 再计算真太阳时修正
 
     Args:
-        hour: 北京时间小时（0-23）
-        minute: 北京时间分钟（0-59）
+        birth_hour: 北京时间小时（0-23）
+        birth_min: 北京时间分钟（0-59）
         lon: 出生地经度
+        year: 出生年（用于判断夏令时，可选）
+        month: 出生月（用于判断夏令时，可选）
+        day: 出生日（用于判断夏令时，可选）
 
     Returns:
-        (真太阳时小时, 真太阳时分钟)
+        (调整后小时, 调整后分钟, 修正信息dict)
+        修正信息包含：
+          - dst_applied: bool，是否应用了夏令时修正
+          - dst_minus_1h: bool，是否减了1小时（夏令时期间）
+          - solar_correction_min: int，真太阳时修正分钟数
+          - original_hour: int，原始输入小时
+          - original_min: int，原始输入分钟
     """
-    correction_minutes = (lon - 120) * 4  # 单位：分钟
-    total_minutes = hour * 60 + minute + correction_minutes
-    # 向下取整到分钟级别（八字只用到小时，取整即可）
+    info = {
+        "dst_applied": False,
+        "dst_minus_1h": False,
+        "solar_correction_min": 0,
+        "original_hour": birth_hour,
+        "original_min": birth_min,
+    }
+
+    effective_hour = birth_hour
+    effective_min = birth_min
+
+    # Step 1: 夏令时修正（1986-1991年）
+    if year is not None and month is not None and day is not None:
+        if is_dst_period(year, month, day):
+            info["dst_applied"] = True
+            info["dst_minus_1h"] = True
+            # 减1小时（夏令时期间，北京时间比真实时间快1小时）
+            total_mins = effective_hour * 60 + effective_min - 60
+            if total_mins < 0:
+                total_mins += 24 * 60
+            effective_hour = total_mins // 60
+            effective_min = total_mins % 60
+
+    # Step 2: 真太阳时修正
+    solar_corr = int((lon - 120) * 4)  # 真太阳时修正（分钟）
+    info["solar_correction_min"] = solar_corr
+
+    total_minutes = effective_hour * 60 + effective_min + solar_corr
     adjusted_minutes = int(total_minutes)
     adj_hour = adjusted_minutes // 60
     adj_min = adjusted_minutes % 60
-    # 处理跨天
+    # 处理跨天（真太阳时可能跨日）
     adj_hour = adj_hour % 24
-    return adj_hour, adj_min
+
+    return adj_hour, adj_min, info
 
 
 if __name__ == "__main__":
@@ -175,18 +268,34 @@ if __name__ == "__main__":
 
     # 测试用例
     test_cases = [
-        ("上海", 121.4737, 7, 0),   # 7:00北京时间 → 真太阳时 ~7:06
-        ("乌鲁木齐", 87.6177, 7, 0),  # 7:00北京时间 → 真太阳时 ~4:54（丑时！）
-        ("北京", 116.4074, 12, 0),   # 12:00北京时间 → 真太阳时 ~11:58
-        ("乌鲁木齐", 87.6177, 23, 0),  # 23:00北京时间 → 真太阳时 ~20:54
+        ("上海", 121.4737, 7, 0, 2024, 5, 1),   # 非DST，7:00北京时间 → 真太阳时 ~7:06
+        ("乌鲁木齐", 87.6177, 7, 0, 2024, 5, 1),  # 非DST，7:00北京时间 → 真太阳时 ~4:54（丑时！）
+        ("北京", 116.4074, 12, 0, 2024, 5, 1),   # 非DST，12:00北京时间 → 真太阳时 ~11:58
+        ("乌鲁木齐", 87.6177, 23, 0, 2024, 5, 1),  # 非DST，23:00北京时间 → 真太阳时 ~20:54
+        # DST边界测试
+        ("乌鲁木齐", 87.6177, 7, 0, 1988, 4, 10),  # DST开始日 7:00北京时间 → DST→6:00, 真太阳时 ~3:48
+        ("乌鲁木齐", 87.6177, 7, 0, 1988, 4, 17),  # DST期间 7:00北京时间 → DST→6:00, 真太阳时 ~3:48
+        ("乌鲁木齐", 87.6177, 7, 0, 1988, 9, 11),  # DST最后一天 7:00北京时间 → DST→6:00, 真太阳时 ~3:48
+        ("乌鲁木齐", 87.6177, 7, 0, 1988, 9, 17),  # DST结束后 7:00北京时间 → 真太阳时 ~4:54
+        # 非DST年份（1986年边界）
+        ("乌鲁木齐", 87.6177, 7, 0, 1986, 5, 3),  # DST前 7:00北京时间 → 真太阳时 ~4:54
+        ("乌鲁木齐", 87.6177, 7, 0, 1986, 5, 4),  # DST首日 7:00北京时间 → DST→6:00, 真太阳时 ~3:48
+        ("乌鲁木齐", 87.6177, 7, 0, 1986, 9, 14),  # DST末日 7:00北京时间 → DST→6:00, 真太阳时 ~3:48
+        ("乌鲁木齐", 87.6177, 7, 0, 1986, 9, 13),  # DST最后一天 7:00北京时间 → DST→6:00
+        ("乌鲁木齐", 87.6177, 7, 0, 1986, 9, 14),  # DST后 7:00北京时间 → 真太阳时 ~4:54
     ]
 
-    print("=== 真太阳时测试 ===")
-    for name, lon, hour, min_in in test_cases:
-        adj_h, adj_m = adjust_birth_hour_for_true_solar(hour, min_in, lon)
-        corr = (lon - 120) * 4
-        print(f"{name} ({lon}°E) {hour:02d}:00 北京时间 → "
-              f"修正{corr:+.0f}分钟 → {adj_h:02d}:{adj_m:02d} 真太阳时")
+    print("=== 真太阳时+夏令时测试 ===")
+    for name, lon, hour, min_in, year, month, day in test_cases:
+        adj_h, adj_m, info = adjust_birth_hour_for_true_solar(hour, min_in, lon, year, month, day)
+        solar_corr = info["solar_correction_min"]
+        dst_flag = " [DST-1h]" if info["dst_minus_1h"] else ""
+        print(f"{name} ({lon}°E) {year}-{month:02d}-{day:02d} {hour:02d}:{min_in:02d} 北京时间 → "
+              f"{adj_h:02d}:{adj_m:02d} 真太阳时{dst_flag} (修正 {solar_corr:+d}分钟)")
+
+    print("\n=== 夏令时边界（给定历史数据）===")
+    for year, ((sm, sd), (em, ed)) in CHINA_DST_PERIODS.items():
+        print(f"{year}年: DST {year}-{sm:02d}-{sd:02d} ~ {year}-{em:02d}-{ed:02d}")
 
     print("\n=== 城市查询测试 ===")
     for city in ["乌鲁木齐", "上海", "北京", "拉萨"]:

@@ -3,7 +3,7 @@
 import argparse, json, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.integrate import calculate_integrated, to_text
-from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar
+from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar, is_dst_period
 
 def main():
     p = argparse.ArgumentParser(description='三体系整合命盘排盘工具')
@@ -19,6 +19,9 @@ def main():
     p.add_argument('--no-solar-time', action='store_true',
                    help='禁用真太阳时修正，使用原始北京时间计算八字')
     args = p.parse_args()
+
+    # 解析出生日期
+    birth_year, birth_month, birth_day = map(int, args.date.split('-'))
 
     # 处理出生时间和经度
     birth_hour = int(args.time.split(':')[0])
@@ -41,10 +44,25 @@ def main():
     true_solar_hour = birth_hour
     true_solar_min = birth_min
     if not args.no_solar_time:
-        true_solar_hour, true_solar_min = adjust_birth_hour_for_true_solar(birth_hour, birth_min, lon)
-        if true_solar_hour != birth_hour or true_solar_min != birth_min:
+        adj_h, adj_m, info = adjust_birth_hour_for_true_solar(
+            birth_hour, birth_min, lon, birth_year, birth_month, birth_day
+        )
+        true_solar_hour, true_solar_min = adj_h, adj_m
+
+        # 输出修正说明
+        solar_corr = info["solar_correction_min"]
+        if info["dst_minus_1h"]:
+            base_hour = (birth_hour - 1) if birth_hour >= 1 else 23
+            base_min = birth_min
+            dst_effective_str = f"{base_hour:02d}:{base_min:02d}"
+            print(f"☀️ 夏令时修正: {birth_year}年出生（夏令时期间），北京时间 {birth_hour:02d}:{birth_min:02d} - 1小时 → {dst_effective_str}")
+            print(f"☀️ 真太阳时修正: 北京时间 {dst_effective_str} → 真太阳时 {true_solar_hour:02d}:{true_solar_min:02d} "
+                  f"(经度 {lon:.1f}°E，修正 {solar_corr:+d}分钟)")
+        elif true_solar_hour != birth_hour or true_solar_min != birth_min:
             print(f"☀️ 真太阳时修正: 北京时间 {birth_hour:02d}:{birth_min:02d} → 真太阳时 {true_solar_hour:02d}:{true_solar_min:02d} "
-                  f"(经度 {lon:.1f}°E，修正 {(lon-120)*4:+.0f}分钟)")
+                  f"(经度 {lon:.1f}°E，修正 {solar_corr:+d}分钟)")
+        else:
+            print(f"☀️ 真太阳时修正: 北京时间 {birth_hour:02d}:{birth_min:02d}，经度 {lon:.1f}°E，修正 {solar_corr:+d}分钟（无需调整）")
 
     time_str = f"{true_solar_hour:02d}:{true_solar_min:02d}"
 
