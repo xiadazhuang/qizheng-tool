@@ -18,6 +18,8 @@ def main():
     p.add_argument('-j', '--json', action='store_true', help='输出JSON格式')
     p.add_argument('--no-solar-time', action='store_true',
                    help='禁用真太阳时修正，使用原始北京时间计算八字')
+    p.add_argument('--no-late-zichen', action='store_true',
+                   help='禁用晚子时规则，使用sxtwl标准规则（23:00-23:59属当天）')
     args = p.parse_args()
 
     # 处理出生时间和经度
@@ -48,8 +50,17 @@ def main():
 
     time_str = f"{true_solar_hour:02d}:{true_solar_min:02d}"
 
+    # 晚子时规则（默认启用）
+    late_zichen = not args.no_late_zichen
+
     result = calculate_integrated(args.name, args.date, time_str,
-                                  lat, lon, args.gender)
+                                  lat, lon, args.gender, late_zichen=late_zichen)
+
+    # 在文本输出中显示时辰分界规则
+    if not args.json:
+        from src.zs_remnants import describe_zichen_rule
+        print(f"⏰ 时辰分界：{describe_zichen_rule(late_zichen)}")
+
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:

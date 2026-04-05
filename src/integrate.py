@@ -66,13 +66,14 @@ def _format_palace(palace):
     }
 
 
-def calculate_integrated(name, birth_date, birth_time, lat, lon, gender='女'):
+def calculate_integrated(name, birth_date, birth_time, lat, lon, gender='女', late_zichen=True):
     """整合八字 + 紫微斗数 + 七政四余"""
+    from zs_remnants import describe_zichen_rule
     year, month, day = map(int, birth_date.split('-'))
     hour, minute = map(int, birth_time.split(':'))
     jd = swe.julday(year, month, day, hour + minute/60.0)
 
-    bazi = calculate_bazi(year, month, day, hour, minute)
+    bazi = calculate_bazi(year, month, day, hour, minute, late_zichen=late_zichen)
     lunar = solar_to_lunar(year, month, day)
     raw_planets = calculate_seven_planets(jd)
     # 加入二十八宿名称
@@ -108,6 +109,7 @@ def calculate_integrated(name, birth_date, birth_time, lat, lon, gender='女'):
         'qizheng': planets,
         'siyu': siyu,
         'ziwei': ziwei,
+        'zichen_rule': describe_zichen_rule(late_zichen),
     }
 
 
@@ -120,6 +122,11 @@ def to_text(data):
 
     b = data['bazi']
     lines.append(f"\n【八字】{b['year']} / {b['month']} / {b['day']} / {b['hour']}")
+
+    # 显示时辰分界规则
+    zichen_rule = data.get('zichen_rule', '')
+    if zichen_rule:
+        lines.append(f"【时辰分界】{zichen_rule}")
 
     lunar = data.get('lunar', {})
     lines.append(f"农历: {lunar.get('year','')}年{lunar.get('month','')}月{lunar.get('day','')}日")

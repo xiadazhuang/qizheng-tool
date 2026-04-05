@@ -65,6 +65,8 @@ with col_input:
         lat    = st.number_input("纬度", value=31.3, step=0.1)
         lon    = st.number_input("经度", value=120.6, step=0.1)
         gender = st.selectbox("性别", ["女", "男"], index=0)
+        late_zichen = st.checkbox("晚子时规则（23:00后属下一天）", value=True,
+                                  help="启用时：23:00-23:59出生，时柱为子时，日柱属下一天。关闭时使用sxtwl标准规则。")
         sub    = st.form_submit_button("🚀 排盘")
 
 if sub:
@@ -87,9 +89,9 @@ if sub:
             corr = (lon - 120) * 4
             st.info(f"☀️ 真太阳时修正: 北京时间 {hour:02d}:{min_v:02d} → 真太阳时 {adj_h:02d}:{adj_m:02d} (修正{corr:+.0f}分钟)")
 
-        result = calculate_integrated(name, date, time_str, lat, lon, gender)
+        result = calculate_integrated(name, date, time_str, lat, lon, gender, late_zichen=late_zichen)
         b      = result["bazi"]
-        st.success(f"✅ {name}  |  {date} {time_str}  |  {gender}")
+        st.success(f"✅ {name}  |  {date} {time_str}  |  {gender}  |  {result.get('zichen_rule', '')}")
 
         # ─── 基础信息 ──────────────────────────────
         c1, c2, c3, c4 = st.columns(4)

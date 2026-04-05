@@ -6,15 +6,16 @@ from seven_planets import calculate_seven_planets
 from four_remnants import calculate_luohou, calculate_jitu, calculate_yuebo, calculate_ziqi
 from mansions import map_to_mansion
 from lunar import calculate_bazi, solar_to_lunar
+from zs_remnants import describe_zichen_rule
 
-def calculate_qizheng(name, birth_date, birth_time, lat, lon):
+def calculate_qizheng(name, birth_date, birth_time, lat, lon, late_zichen=True):
     """计算完整七政四余命盘"""
     year, month, day = map(int, birth_date.split('-'))
     hour, minute = map(int, birth_time.split(':'))
     jd = swe.julday(year, month, day, hour + minute/60.0)
 
     # 八字
-    bazi = calculate_bazi(year, month, day, hour, minute)
+    bazi = calculate_bazi(year, month, day, hour, minute, late_zichen=late_zichen)
 
     # 七政
     planets = calculate_seven_planets(jd)
@@ -40,6 +41,7 @@ def calculate_qizheng(name, birth_date, birth_time, lat, lon):
         "qizheng": {k: {"degree": v, "mansion": mansion_map[k]["mansion"]} for k, v in planets.items()},
         "siyu": siyu,
         "mansions": mansion_map,
+        "zichen_rule": describe_zichen_rule(late_zichen),
     }
 
 if __name__ == "__main__":
