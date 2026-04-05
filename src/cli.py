@@ -4,6 +4,7 @@ import argparse, json, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.integrate import calculate_integrated, to_text
 from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar
+from src.qiyun import calculate_qiyun, format_qiyun
 
 def main():
     p = argparse.ArgumentParser(description='三体系整合命盘排盘工具')
@@ -20,6 +21,8 @@ def main():
                    help='禁用真太阳时修正，使用原始北京时间计算八字')
     p.add_argument('--no-late-zichen', action='store_true',
                    help='禁用晚子时规则，使用sxtwl标准规则（23:00-23:59属当天）')
+    p.add_argument('-q', '--qiyun', action='store_true',
+                   help='同时计算起运信息（大运起始岁数和大运干支）')
     args = p.parse_args()
 
     # 处理出生时间和经度
@@ -60,6 +63,17 @@ def main():
     if not args.json:
         from src.zs_remnants import describe_zichen_rule
         print(f"⏰ 时辰分界：{describe_zichen_rule(late_zichen)}")
+
+    # 起运计算
+    if args.qiyun:
+        qiyun_result = calculate_qiyun(args.date, time_str,
+                                       gender=args.gender,
+                                       late_zichen=late_zichen)
+        if args.json:
+            result['qiyun'] = qiyun_result
+        else:
+            print()
+            print(format_qiyun(qiyun_result))
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
