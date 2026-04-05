@@ -3,6 +3,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from integrate import calculate_integrated
+from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar
 
 st.set_page_config(page_title="三体系整合命盘", page_icon="🐱", layout="wide")
 
@@ -60,6 +61,7 @@ with col_input:
         name   = st.text_input("姓名", value="Gigi Wu")
         date   = st.text_input("出生日期", value="1990-10-23")
         time_v = st.text_input("出生时间（HH:MM）", value="07:00")
+        city   = st.text_input("出生城市（留空则使用下方经纬度）", value="")
         lat    = st.number_input("纬度", value=31.3, step=0.1)
         lon    = st.number_input("经度", value=120.6, step=0.1)
         gender = st.selectbox("性别", ["女", "男"], index=0)
@@ -67,9 +69,27 @@ with col_input:
 
 if sub:
     try:
-        result = calculate_integrated(name, date, time_v, lat, lon, gender)
+        # 处理城市名 → 经纬度
+        if city.strip():
+            try:
+                coords = get_city_coordinates(city.strip())
+                lat, lon = coords[0], coords[1]
+                st.info(f"📍 城市「{city}」经纬度: ({lat:.4f}, {lon:.4f})")
+            except ValueError as e:
+                st.warning(f"{e}，使用手动输入的经纬度。")
+
+        # 真太阳时修正
+        hour = int(time_v.split(':')[0])
+        min_v = int(time_v.split(':')[1]) if ':' in time_v else 0
+        adj_h, adj_m = adjust_birth_hour_for_true_solar(hour, min_v, lon)
+        time_str = f"{adj_h:02d}:{adj_m:02d}"
+        if adj_h != hour or adj_m != min_v:
+            corr = (lon - 120) * 4
+            st.info(f"☀️ 真太阳时修正: 北京时间 {hour:02d}:{min_v:02d} → 真太阳时 {adj_h:02d}:{adj_m:02d} (修正{corr:+.0f}分钟)")
+
+        result = calculate_integrated(name, date, time_str, lat, lon, gender)
         b      = result["bazi"]
-        st.success(f"✅ {name}  |  {date} {time_v}  |  {gender}")
+        st.success(f"✅ {name}  |  {date} {time_str}  |  {gender}")
 
         # ─── 基础信息 ──────────────────────────────
         c1, c2, c3, c4 = st.columns(4)
