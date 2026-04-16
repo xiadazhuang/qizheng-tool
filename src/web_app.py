@@ -3,7 +3,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from integrate import calculate_integrated
-from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar
+from src.solar_time import get_city_coordinates, adjust_birth_hour_for_true_solar, is_dst_period
 
 st.set_page_config(page_title="三体系整合命盘", page_icon="🐱", layout="wide")
 
@@ -71,6 +71,9 @@ with col_input:
 
 if sub:
     try:
+        # 解析年月日
+        year, month, day = map(int, date.split('-'))
+
         # 处理城市名 → 经纬度
         if city.strip():
             try:
@@ -80,14 +83,21 @@ if sub:
             except ValueError as e:
                 st.warning(f"{e}，使用手动输入的经纬度。")
 
-        # 真太阳时修正
+        # 真太阳时修正（传入年月日以支持夏令时判断）
         hour = int(time_v.split(':')[0])
         min_v = int(time_v.split(':')[1]) if ':' in time_v else 0
-        adj_h, adj_m = adjust_birth_hour_for_true_solar(hour, min_v, lon)
+        adj_h, adj_m, info = adjust_birth_hour_for_true_solar(hour, min_v, lon, year, month, day)
         time_str = f"{adj_h:02d}:{adj_m:02d}"
-        if adj_h != hour or adj_m != min_v:
-            corr = (lon - 120) * 4
-            st.info(f"☀️ 真太阳时修正: 北京时间 {hour:02d}:{min_v:02d} → 真太阳时 {adj_h:02d}:{adj_m:02d} (修正{corr:+.0f}分钟)")
+
+        # 输出修正说明
+        solar_corr = info["solar_correction_min"]
+        if info["dst_minus_1h"]:
+            base_h = (hour - 1) if hour >= 1 else 23
+            base_str = f"{base_h:02d}:{min_v:02d}"
+            st.info(f"☀️ 夏令时修正: {year}年出生（夏令时期间），北京时间 {hour:02d}:{min_v:02d} - 1小时 → {base_str}")
+            st.info(f"☀️ 真太阳时修正: 北京时间 {base_str} → 真太阳时 {adj_h:02d}:{adj_m:02d} (经度 {lon:.1f}°E，修正 {solar_corr:+d}分钟)")
+        elif adj_h != hour or adj_m != min_v:
+            st.info(f"☀️ 真太阳时修正: 北京时间 {hour:02d}:{min_v:02d} → 真太阳时 {adj_h:02d}:{adj_m:02d} (修正 {solar_corr:+d}分钟)")
 
         result = calculate_integrated(name, date, time_str, lat, lon, gender, late_zichen=late_zichen)
         b      = result["bazi"]
